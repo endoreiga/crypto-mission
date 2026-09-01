@@ -19,10 +19,14 @@ function setPacket(text,kind=""){$("#packet").textContent=text;$("#packet").clas
 function setProcess(text){$("#process").textContent=text}
 
 function renderNav(){
-  const labels=["共通鍵","公開鍵","デジタル署名"];
-  $("#stage-nav").innerHTML=labels.map((label,index)=>{
-    const number=index+1,done=state.completed.has(number),current=state.stage===number;
-    return `<button class="stage-step ${done?"done":""} ${current?"current":""}" data-stage="${number}" ${number>state.stage&&!done?"disabled":""}><span class="stage-number">${done?"✓":number}</span><span>${label}</span></button>`;
+  const items=[
+    {number:1,label:"MISSION 1：共通鍵暗号方式"},
+    {number:2,label:"MISSION 2：公開鍵暗号方式"},
+    {number:3,label:"発展MISSION：デジタル署名",advanced:true}
+  ];
+  $("#stage-nav").innerHTML=items.map(item=>{
+    const done=state.completed.has(item.number),current=state.stage===item.number,available=item.number===1||state.completed.has(item.number-1);
+    return `<button class="stage-step ${done?"done":""} ${current?"current":""} ${item.advanced?"advanced":""}" data-stage="${item.number}" ${!available&&!current?"disabled":""}><span class="stage-number">${done?"✓":item.advanced?"＋":item.number}</span><span>${item.label}</span></button>`;
   }).join("");
   document.querySelectorAll("[data-stage]:not([disabled])").forEach(button=>button.addEventListener("click",()=>goStage(Number(button.dataset.stage))));
 }
@@ -36,7 +40,7 @@ function goStage(stage){
   runToken++;state.stage=stage;state.result=null;state.slots={};state.tampered=false;state.direction="forward";
   state.activeSlot=stage===3?"sign":"encrypt";if(stage===1)state.stage1Phase="ready";resetBoard();render();
 }
-function render(){renderFrame();if(state.stage===1)renderShared();if(state.stage===2)renderPublic();if(state.stage===3)renderSignature();if(state.stage===4)renderFinal()}
+function render(){renderFrame();if(state.stage===1)renderShared();if(state.stage===2)renderPublic();if(state.stage===3)renderSignature();if(state.stage===4)renderTodayComplete();if(state.stage===5)renderFinal()}
 function mission(tag,title,sub=""){$("#mission").innerHTML=`<span class="mission-tag">${tag}</span><div><h1>${title}</h1>${sub?`<p>${sub}</p>`:""}</div>`}
 function button(label,id,kind=""){return `<button id="${id}" class="button ${kind}" type="button">${label}</button>`}
 function bind(id,handler){const element=$("#"+id);if(element)element.addEventListener("click",handler)}
@@ -83,30 +87,36 @@ function bindKeyControls(renderFunction){
 }
 function publicResultBox(){
   if(!state.result)return '<div class="result-box"><strong>二人で相談：</strong><p>どの鍵を使えば，イブには読めず，受信者だけが読める？</p></div>';
-  return `<div class="result-box ${state.result.clear?"clear":""}"><strong>${state.result.title}</strong><p>${state.result.prompt}</p></div>`;
+  return `<div class="result-box ${state.result.clear?"clear":""}"><div class="result-copy"><strong>${state.result.title}</strong>${state.result.reason?`<span>${state.result.reason}</span>`:""}<p>${state.result.prompt}</p></div></div>`;
 }
 function renderPublic(){
   mission("ステージ 2｜公開鍵暗号",`${sender()}から${receiver()}へ，イブには読まれず，${receiver()}だけが読めるように送ろう`);
-  $("#workspace").innerHTML=`<div class="workspace-head"><h2>鍵を空欄に置こう</h2><span class="prompt">今選んでいる場所：${state.activeSlot==="encrypt"?"暗号化":"復号"}</span></div><div class="controls">${slots("public")}${keyCards()}</div>${publicResultBox()}<div class="actions">${state.result?.clear?button(state.direction==="forward"?"発展：ボブからアリスへ":"基本問題に戻る","reverse","secondary"):""}${button("選び直す","retry-public","secondary")}${button("通信してみる","run-public")}${state.result?.clear?button("ステージ3へ","next-stage"):""}</div>`;
+  $("#workspace").innerHTML=`<div class="workspace-head"><h2>鍵を空欄に置こう</h2><span class="prompt">今選んでいる場所：${state.activeSlot==="encrypt"?"暗号化":"復号"}</span></div><div class="controls">${slots("public")}${keyCards()}</div>${publicResultBox()}${state.result?.clear?'<div class="reflection"><strong>なぜこの組み合わせなら安全に通信できた？</strong><span>暗号化に使ったのは誰の鍵？</span><span>復号に使ったのは誰の鍵？</span><span>イブが復号できなかったのはなぜ？</span></div>':""}<div class="actions">${state.result?.clear?button(state.direction==="forward"?"発展：ボブからアリスへ":"基本問題に戻る","reverse","secondary"):""}${button("選び直す","retry-public","secondary")}${button("通信してみる","run-public")}${state.result?.clear?button("今日のまとめへ","today-complete"):""}</div>`;
   bindKeyControls(renderPublic);bind("retry-public",()=>{runToken++;state.slots={};state.result=null;resetBoard();renderPublic()});bind("run-public",runPublic);
   bind("reverse",()=>{state.direction=state.direction==="forward"?"reverse":"forward";state.slots={};state.result=null;resetBoard();render()});
-  bind("next-stage",()=>{state.completed.add(2);goStage(3)});
+  bind("today-complete",()=>{state.completed.add(2);state.stage=4;render()});
 }
 async function runPublic(){
   if(!state.slots.encrypt||!state.slots.decrypt){state.result={title:"鍵がまだ足りない",prompt:"二つの空欄に鍵を置こう．"};renderPublic();return}
   const token=++runToken,s=sender(),r=receiver(),rid=personId(r),enc=keyById(state.slots.encrypt),dec=keyById(state.slots.decrypt);
   state.result=null;setPacket("💬 明日の集合は10時");setProcess(`${s}が暗号化を試す`);setStatus("#eve-result","見ている");setStatus("#bob-result","待っている");
   await wait(500);if(token!==runToken)return;
-  if(enc.kind==="秘密鍵"&&enc.owner!==s){setProcess(`${s}はその鍵を持っていない`);state.result={title:`${s}はこの鍵を持っていない`,prompt:"秘密鍵はだれが持っている？"};renderPublic();return}
+  if(enc.kind==="秘密鍵"&&enc.owner!==s){setProcess(`${s}はその鍵を持っていない`);state.result={title:"この鍵は送信者が使えません",reason:`${enc.owner}の秘密鍵は，${enc.owner}だけが持っている鍵です．`,prompt:"送信者が実際に使える鍵はどれだろう？"};renderPublic();return}
   setPacket("◆◇■△…","cipher");setProcess(`${enc.owner}の${enc.kind}で暗号化`);
   await wait(550);if(token!==runToken)return;$("#packet").classList.add("travel");await wait(800);if(token!==runToken)return;
   const eveReads=enc.kind==="秘密鍵";setStatus("#eve-result",eveReads?"公開鍵で読めた":"暗号文は見えた／読めない",eveReads?"bad":"good");
-  if(eveReads){setStatus("#bob-result","受け取った","warn");state.result={title:"イブが読めた",prompt:"この鍵に対応する公開鍵は，だれでも使える．"};renderPublic();return}
+  if(eveReads){setStatus("#bob-result","受け取った","warn");state.result={title:"イブが内容を読めました",reason:"対応する公開鍵は，だれでも使えます．",prompt:"秘密に送りたい相手は誰だろう？"};renderPublic();return}
   await wait(500);if(token!==runToken)return;
-  if(dec.kind==="秘密鍵"&&dec.owner!==r){setStatus("#bob-result",`${r}はその鍵を持っていない`,"bad");state.result={title:`${r}はこの鍵を持っていない`,prompt:`${r}本人が持つ秘密鍵はどれ？`};renderPublic();return}
-  const clear=enc.id===`${rid}-public`&&dec.id===`${rid}-private`;
-  if(clear){setPacket("💬 明日の集合は10時");setProcess(`${r}の秘密鍵で復号`);setStatus("#bob-result",`${r}だけが読めた`,"good");state.result={clear:true,title:"MISSION CLEAR",prompt:`なぜ${s}の鍵ではなく，${r}の鍵を使ったのだろう？`};state.completed.add(2)}
-  else{setStatus("#bob-result","暗号文のまま／読めない","bad");state.result={title:`${r}が読めなかった`,prompt:"暗号化に使った鍵と，どの鍵が組になる？"}}
+  const matchingPair=enc.kind==="公開鍵"&&dec.kind==="秘密鍵"&&enc.owner===dec.owner;
+  const clear=matchingPair&&enc.owner===r;
+  if(clear){
+    setPacket("💬 明日の集合は10時");setProcess(`${r}の秘密鍵で復号`);setStatus("#bob-result",`${r}だけが読めた`,"good");setStatus("#eve-result",`暗号文は見えた／${r}の秘密鍵がなく読めない`,"good");
+    state.result={clear:true,title:"MISSION CLEAR｜ボブだけが読めました",reason:"イブは暗号文を見ても，ボブの秘密鍵を持っていないため復号できません．",prompt:"下の3つの問いを，二人で話してみよう．"};state.completed.add(2);
+  }else if(matchingPair&&enc.owner===s){
+    setStatus("#bob-result",`${r}は復号できない`,"bad");state.result={title:"鍵の組は対応していますが，MISSIONを達成できません",reason:`この暗号文を復号できるのは${s}です．今回読めるようにしたい相手は${r}です．`,prompt:"誰に読ませたいのかを考え直そう．"};
+  }else{
+    setStatus("#bob-result",`${r}は復号できない`,"bad");state.result={title:`${r}はメッセージを復号できませんでした`,reason:"暗号化に使った鍵と，復号に使った鍵が対応していません．",prompt:"この2つの鍵は，同じ人の鍵だろうか？"};
+  }
   renderPublic();
 }
 
@@ -119,7 +129,7 @@ function renderSignature(){
   mission("ステージ 3｜デジタル署名","ボブは，本当にアリスから届き，途中で書き換えられていないか確かめたい");
   const hasValid=state.result?.verified;
   $("#workspace").innerHTML=`<div class="purpose">今度の目的は，メッセージを秘密にすることではありません</div><div class="controls">${slots("signature")}${keyCards()}</div>${signatureResultBox()}${state.signedHash?`<details class="hash-details"><summary>メッセージから作った指紋（ハッシュ値）を詳しく見る</summary><span class="hash">${state.tampered?state.receivedHash:state.signedHash}</span></details>`:""}<div class="actions">${hasValid&&!state.tampered?button("イブが途中で「10時」を「8時」に書き換える","tamper","secondary"):""}${button("選び直す","retry-signature","secondary")}${button(state.tampered?"もう一度検証する":"署名して送る","run-signature")}${state.result?.tamperFound?button("完了画面へ","finish"):""}</div>`;
-  bindKeyControls(renderSignature);bind("retry-signature",()=>{runToken++;state.slots={};state.result=null;state.tampered=false;state.signedHash="";resetBoard();renderSignature()});bind("run-signature",runSignature);bind("tamper",tamperMessage);bind("finish",()=>{state.completed.add(3);state.stage=4;render()});
+  bindKeyControls(renderSignature);bind("retry-signature",()=>{runToken++;state.slots={};state.result=null;state.tampered=false;state.signedHash="";resetBoard();renderSignature()});bind("run-signature",runSignature);bind("tamper",tamperMessage);bind("finish",()=>{state.completed.add(3);state.stage=5;render()});
 }
 async function runSignature(){
   if(!state.slots.sign||!state.slots.verify){state.result={title:"鍵がまだ足りない",prompt:"二つの空欄に鍵を置こう．"};renderSignature();return}
@@ -138,10 +148,15 @@ async function runSignature(){
   renderSignature();
 }
 function tamperMessage(){state.tampered=true;state.result=null;setPacket("💬 明日の集合は8時","travel");setProcess("イブがメッセージを書き換えた");setStatus("#eve-result","10時を8時に書き換えた","bad");setStatus("#bob-result","もう一度検証する","warn");renderSignature()}
+function renderTodayComplete(){
+  renderNav();mission("今日のまとめ","今日のMISSION COMPLETE");
+  $("#workspace").innerHTML=`<div class="final"><div class="big">🎉🔑</div><h1>共通鍵暗号方式・公開鍵暗号方式の<br>MISSIONをクリアしました</h1><p class="final-question">誰がその鍵を持ち，誰に読ませるために使った？</p><p class="next-question">ここから先は，次の学習で取り組む発展MISSIONです．</p><div class="actions">${button("最初からやり直す","today-reset","secondary")}${button("発展MISSION：デジタル署名へ","advanced-signature")}</div></div>`;
+  setPacket("✓ 今日の通信");setProcess("先生の説明で整理しよう");setStatus("#eve-result","観察完了","good");setStatus("#bob-result","MISSION完了","good");bind("today-reset",resetAll);bind("advanced-signature",()=>goStage(3));
+}
 function renderFinal(){
-  renderNav();mission("すべて完了","3つのMISSION完了");
-  $("#workspace").innerHTML=`<div class="final"><div class="big">🎉🔑</div><h1>おつかれさまでした</h1><p class="final-question">3つの方式では，<br>だれのどの鍵を，何のために使った？</p><p class="next-question">では，その公開鍵が本当にアリスやボブのものだと，どうやって確かめるのでしょう？</p><div class="actions">${button("最初からやり直す","final-reset","secondary")}</div></div>`;
-  setPacket("✓ 3つの通信");setProcess("先生の説明で整理しよう");setStatus("#eve-result","観察完了","good");setStatus("#bob-result","確認完了","good");bind("final-reset",resetAll);
+  renderNav();mission("発展MISSION完了","デジタル署名のMISSION完了");
+  $("#workspace").innerHTML=`<div class="final"><div class="big">🎉✍️</div><h1>発展MISSIONをクリアしました</h1><p class="final-question">署名では，誰のどの鍵を，何のために使った？</p><p class="next-question">では，その公開鍵が本当にアリスやボブのものだと，どうやって確かめるのでしょう？</p><div class="actions">${button("今日の完了画面へ戻る","today-again","secondary")}${button("最初からやり直す","final-reset","secondary")}</div></div>`;
+  setPacket("✓ 発展MISSION");setProcess("署名の役割を振り返ろう");setStatus("#eve-result","改ざんを観察","good");setStatus("#bob-result","署名を確認","good");bind("today-again",()=>{state.stage=4;render()});bind("final-reset",resetAll);
 }
 function resetAll(){runToken++;state.stage=1;state.completed.clear();state.direction="forward";state.slots={};state.result=null;state.stage1Phase="ready";state.signedHash="";state.tampered=false;resetBoard();render()}
 $("#reset-all").addEventListener("click",resetAll);render();
