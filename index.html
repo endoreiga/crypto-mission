@@ -1,13 +1,31 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="高校「情報Ⅰ」向け暗号学習ウェブアプリ"><title>暗号通信ミッション｜暗号通信体験</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="高校「情報Ⅰ」向け暗号学習ウェブアプリ">
+  <title>暗号通信ミッション｜情報Ⅰ</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar"><button id="home-button" class="brand" aria-label="ミッション選択へ戻る">🔐 <span>暗号通信ミッション</span></button><p>高校「情報Ⅰ」｜二人で取り組む教材</p><span class="sim-label">教材用の体験モデル</span></header>
-  <main id="app" tabindex="-1" aria-live="polite"></main>
-  <footer>実際の暗号処理を完全に再現するものではありません．</footer>
+  <header class="topbar">
+    <div class="brand">🔐 <span>暗号通信ミッション</span></div>
+    <p>二人で相談して，通信のしくみを見つけよう</p>
+    <button id="reset-all" class="text-button" type="button">最初から</button>
+  </header>
+  <nav id="stage-nav" class="stage-nav" aria-label="学習の進み具合"></nav>
+  <main>
+    <section id="mission" class="mission" aria-live="polite"></section>
+    <section class="board" aria-label="通信のようす">
+      <article class="person alice"><div class="avatar" aria-hidden="true">👩‍💻</div><div><strong>アリス</strong><span id="alice-role">送信者</span></div></article>
+      <div class="route"><div id="route-label" class="route-label">通信経路</div><div class="route-line" aria-hidden="true"><span></span></div><div id="packet" class="packet">💬 平文</div><div id="process" class="process" aria-live="polite">操作を始めよう</div></div>
+      <article class="person bob"><div class="avatar" aria-hidden="true">👨‍💻</div><div><strong>ボブ</strong><span id="bob-role">受信者</span></div></article>
+      <article class="person eve"><div class="avatar" aria-hidden="true">🕵️</div><div><strong>イブ</strong><span>通信経路を盗み見る</span></div><div id="eve-result" class="person-result">まだ見ていない</div></article>
+      <div id="bob-result" class="person-result bob-result">まだ受け取っていない</div>
+    </section>
+    <section id="workspace" class="workspace" aria-live="polite"></section>
+  </main>
+  <footer>これは鍵の役割を学ぶための体験モデルです．実際の暗号処理を完全に再現するものではありません．</footer>
   <script src="app.js"></script>
-</body></html>
+</body>
+</html>
