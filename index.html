@@ -1,80 +1,13 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="高校「情報Ⅰ」向けに，共通鍵暗号・公開鍵暗号・デジタル署名をペアで体験する教材用Webアプリです．">
-  <title>Crypto Mission｜暗号通信体験</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="高校「情報Ⅰ」向け暗号学習Webアプリ"><title>Crypto Mission｜暗号通信体験</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="site-header">
-    <div>
-      <p class="eyebrow">高校「情報Ⅰ」｜ペアワーク教材</p>
-      <h1>Crypto Mission</h1>
-      <p class="subtitle">AliceとBobの通信を，盗聴者Eveから守れ．</p>
-    </div>
-    <div class="simulation-note"><strong>教材用シミュレーション</strong><span>実際の暗号処理を再現するものではありません</span></div>
-  </header>
-
-  <main>
-    <nav class="stage-nav" aria-label="学習ステージ">
-      <button class="stage-tab active" data-stage="shared"><span>STAGE 1</span>共通鍵暗号</button>
-      <button class="stage-tab" data-stage="public"><span>STAGE 2｜MAIN</span>公開鍵暗号</button>
-      <button class="stage-tab" data-stage="signature"><span>STAGE 3</span>デジタル署名</button>
-    </nav>
-
-    <section id="shared" class="stage active" aria-labelledby="shared-title">
-      <div class="mission-heading">
-        <div><p class="mission-no">MISSION 01</p><h2 id="shared-title">2人だけの共通鍵で通信せよ</h2></div>
-        <p>ペアで相談し，Aliceが暗号化に使う鍵を選ぼう．</p>
-      </div>
-      <div class="communication-board">
-        <article class="person alice"><div class="avatar">A</div><h3>Alice</h3><p>送信者</p></article>
-        <div class="channel"><p class="plain-message">「明日は10時に集合」</p><div class="arrow">──────▶</div><p id="shared-packet" class="packet">送信準備中</p></div>
-        <article class="person bob"><div class="avatar">B</div><h3>Bob</h3><p>受信者</p></article>
-        <article class="person eve"><div class="avatar">E</div><h3>Eve</h3><p>盗聴者</p><div id="shared-eve" class="speech">通信をねらっている…</div></article>
-      </div>
-      <div class="workspace">
-        <div><h3>鍵を選択</h3><div id="shared-keys" class="key-grid"></div></div>
-        <aside class="result-panel" aria-live="polite"><h3>通信ログ</h3><div id="shared-log" class="log">鍵を選ぶと，通信が始まります．</div></aside>
-      </div>
-    </section>
-
-    <section id="public" class="stage" aria-labelledby="public-title">
-      <div class="mission-heading">
-        <div><p class="mission-no">MISSION 02｜MAIN MISSION</p><h2 id="public-title">受信者だけが読める暗号文を送れ</h2></div>
-        <div class="direction-switch" role="group" aria-label="通信方向"><button class="active" data-direction="alice-bob">Alice → Bob</button><button data-direction="bob-alice">Bob → Alice</button></div>
-      </div>
-      <div class="communication-board">
-        <article class="person alice"><div class="avatar">A</div><h3>Alice</h3><p id="alice-role">送信者</p></article>
-        <div class="channel"><p id="public-message" class="plain-message">「テストの範囲は3章」</p><div id="public-arrow" class="arrow">──────▶</div><div id="crypto-flow" class="crypto-flow"><span>鍵を選んで通信開始</span></div></div>
-        <article class="person bob"><div class="avatar">B</div><h3>Bob</h3><p id="bob-role">受信者</p></article>
-        <article class="person eve"><div class="avatar">E</div><h3>Eve</h3><p>盗聴者</p><div id="public-eve" class="speech">暗号文なら盗み見できるかも？</div></article>
-      </div>
-      <div class="workspace">
-        <div><h3 id="key-question">Aliceが暗号化に使う鍵は？</h3><p class="hint">🔑の形は同じです．ラベルと「誰が持てるか」に注目しよう．</p><div id="public-keys" class="key-grid four"></div></div>
-        <aside class="result-panel" aria-live="polite"><h3>判定・通信ログ</h3><div id="public-log" class="log">4本の鍵から1本を選んでください．</div></aside>
-      </div>
-    </section>
-
-    <section id="signature" class="stage" aria-labelledby="signature-title">
-      <div class="mission-heading">
-        <div><p class="mission-no">MISSION 03｜公開鍵暗号とは別の目的</p><h2 id="signature-title">送信者と改ざんの有無を確かめよ</h2></div>
-        <p>署名はメッセージを秘密にする仕組みではありません．</p>
-      </div>
-      <div class="signature-lab">
-        <div class="message-editor"><label for="sign-message">Aliceのメッセージ</label><textarea id="sign-message" rows="3">明日の集合は10時です</textarea><button id="sign-button" class="primary">署名を作成</button></div>
-        <ol id="signature-flow" class="process-flow">
-          <li><span>1</span><strong>メッセージ</strong><small>入力待ち</small></li><li><span>2</span><strong>SHA-256ハッシュ</strong><small>計算待ち</small></li><li><span>3</span><strong>Aliceの秘密鍵で署名</strong><small>作成待ち</small></li><li><span>4</span><strong>Aliceの公開鍵で検証</strong><small>検証待ち</small></li>
-        </ol>
-        <div class="tamper-box"><label for="received-message">受信したメッセージ（Eveが改ざん可能）</label><textarea id="received-message" rows="2" disabled></textarea><div class="tamper-actions"><button id="tamper-button" disabled>Eveが「11時」に改ざん</button><button id="verify-button" disabled>Bobが再検証</button></div><div id="signature-result" class="log" aria-live="polite">まず署名を作成してください．</div></div>
-      </div>
-    </section>
-
-    <section class="key-rule"><h2>この教材の鍵アイコンのルール</h2><p>すべて同じ <strong>🔑</strong> です．形ではなく，<strong>誰が持てる鍵か</strong>で区別します．</p><div class="rule-cards"><div><b>🔑 PUBLIC KEY</b><span>誰でも利用可能</span></div><div><b>🔑 PRIVATE KEY</b><span>本人だけが所持</span></div><div><b>🔑 SHARED KEY</b><span>AliceとBobが共有</span></div></div></section>
-  </main>
-  <footer>Crypto Mission｜授業での対話と試行錯誤を目的とした教材</footer>
+  <header class="topbar"><button id="home-button" class="brand" aria-label="ミッション選択へ戻る">🔐 <span>Crypto Mission</span></button><p>高校「情報Ⅰ」｜ペアワーク教材</p><span class="sim-label">教材用シミュレーション</span></header>
+  <main id="app" tabindex="-1" aria-live="polite"></main>
+  <footer>実際の暗号処理を完全に再現するものではありません．</footer>
   <script src="app.js"></script>
-</body>
-</html>
+</body></html>

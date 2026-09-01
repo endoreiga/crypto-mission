@@ -1,96 +1,32 @@
-const $ = (s, root=document) => root.querySelector(s);
-const $$ = (s, root=document) => [...root.querySelectorAll(s)];
+const app=document.querySelector('#app'),homeButton=document.querySelector('#home-button');
+const allKeys=[{id:'alice-public',label:'PUBLIC KEY',owner:'Aliceの公開鍵',note:'誰でも利用可能'},{id:'alice-private',label:'PRIVATE KEY',owner:'Aliceの秘密鍵',note:'Alice本人だけが所持'},{id:'bob-public',label:'PUBLIC KEY',owner:'Bobの公開鍵',note:'誰でも利用可能'},{id:'bob-private',label:'PRIVATE KEY',owner:'Bobの秘密鍵',note:'Bob本人だけが所持'}];
+const state={mission:'home',step:0,direction:'alice-bob',encryptKey:null,decryptKey:null,signedHash:'',originalMessage:''};
+function setScreen(html){app.innerHTML=html;app.focus({preventScroll:true});window.scrollTo({top:0,behavior:'smooth'})}
+function progress(current,total){return `<div class="progress" aria-label="${total}段階中${current}段階">${Array.from({length:total},(_,i)=>`<span class="${i<current?'done':''}"></span>`).join('')}</div>`}
+function head(kicker,title,lead,current,total){return `<div class="screen-head"><div><p class="kicker">${kicker}</p><h1>${title}</h1>${lead?`<p class="lead">${lead}</p>`:''}</div>${total?progress(current,total):''}</div>`}
+function person(name,role){return `<div class="person ${name.toLowerCase()}"><div class="avatar">${name[0]}</div><strong>${name}</strong><small>${role}</small></div>`}
+function keyCards(keys,selected){return `<div class="key-grid ${keys.length===3?'three':''}">${keys.map(k=>`<button class="key-card ${selected===k.id?'selected':''}" data-key="${k.id}"><span class="icon">🔑</span><b>${k.label}</b><strong>${k.owner}</strong><small>${k.note}</small></button>`).join('')}</div>`}
+function button(label,id,kind='primary',disabled=false){return `<button id="${id}" class="button ${kind}" ${disabled?'disabled':''}>${label}</button>`}
+function showHome(){state.mission='home';state.step=0;setScreen(`<section class="screen">${head('MISSION SELECT','暗号通信の仕組みを体験しよう','2人で相談し，理由を言葉にしながら進めてください．')}<div class="mission-grid"><button class="mission-card" data-mission="shared"><span class="number">STAGE 1</span><strong>共通鍵暗号</strong><p>同じ鍵を共有して送受信する仕組み</p><em>開始する →</em></button><button class="mission-card main" data-mission="public"><span class="number">STAGE 2｜MAIN</span><strong>公開鍵暗号</strong><p>Eveに読まれず，相手だけが復号できる通信をつくる</p><em>開始する →</em></button><button class="mission-card" data-mission="signature"><span class="number">STAGE 3</span><strong>デジタル署名</strong><p>送信者と改ざんの有無を確かめる仕組み</p><em>開始する →</em></button></div><p class="mini-rule">鍵はすべて同じ🔑．<b>PUBLIC / PRIVATE / SHARED</b>と，誰が持つかで区別します．</p></section>`);document.querySelectorAll('[data-mission]').forEach(b=>b.onclick=()=>startMission(b.dataset.mission))}
+function startMission(mission){state.mission=mission;state.step=1;state.encryptKey=null;state.decryptKey=null;if(mission==='public')renderPublic();if(mission==='shared')renderShared();if(mission==='signature')renderSignature()}
+homeButton.onclick=showHome;
+function bindKeys(field,render){document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{state[field]=b.dataset.key;render()})}
 
-const keys = {
-  shared: [
-    {id:'shared-ab', label:'SHARED KEY', owner:'AliceとBobが共有', note:'2人だけが所持'},
-    {id:'alice-only', label:'PRIVATE KEY', owner:'Aliceの秘密鍵', note:'Alice本人だけが所持'},
-    {id:'public-eve', label:'PUBLIC KEY', owner:'Eveの公開鍵', note:'誰でも利用可能'}
-  ],
-  public: [
-    {id:'alice-public', label:'PUBLIC KEY', owner:'Aliceの公開鍵', note:'誰でも利用可能'},
-    {id:'alice-private', label:'PRIVATE KEY', owner:'Aliceの秘密鍵', note:'Alice本人だけが所持'},
-    {id:'bob-public', label:'PUBLIC KEY', owner:'Bobの公開鍵', note:'誰でも利用可能'},
-    {id:'bob-private', label:'PRIVATE KEY', owner:'Bobの秘密鍵', note:'Bob本人だけが所持'}
-  ]
-};
+function renderPublic(){
+  const forward=state.direction==='alice-bob',sender=forward?'Alice':'Bob',receiver=forward?'Bob':'Alice';
+  if(state.step===1){setScreen(`<section class="screen">${head('STAGE 2｜PUBLIC-KEY ENCRYPTION','通信の方向を選ぶ','まずは送り手と受け手を決めます．',1,5)}<div class="panel"><h2 class="question">どちら向きに通信する？</h2><div class="route">${person('Alice',forward?'送信者':'受信者')}<div class="message"><b>${forward?'Alice → Bob':'Bob → Alice'}</b><span>ボタンで方向を切り替えられます</span></div>${person('Bob',forward?'受信者':'送信者')}</div><div class="actions">${button('方向を切り替える','switch-direction','secondary')}${button('この方向で始める','choose-direction')}</div></div></section>`);document.querySelector('#switch-direction').onclick=()=>{state.direction=forward?'bob-alice':'alice-bob';renderPublic()};document.querySelector('#choose-direction').onclick=()=>{state.step=2;renderPublic()}}
+  else if(state.step===2){setScreen(`<section class="screen">${head('STAGE 2｜STEP 1','暗号化に使う鍵を選ぶ',`${sender}が「テスト範囲は3章」と送ります．`,2,5)}<div class="panel"><h2 class="question">${sender}は，どの鍵を使う？</h2>${keyCards(allKeys,state.encryptKey)}<div class="actions">${button('通信を開始','send-message','primary',!state.encryptKey)}</div></div></section>`);bindKeys('encryptKey',renderPublic);document.querySelector('#send-message').onclick=()=>{state.step=3;renderPublic()}}
+  else if(state.step===3){const view=observeEncryption(state.encryptKey,sender,receiver);setScreen(`<section class="screen">${head('STAGE 2｜STEP 2','通信中のEveを観察する','結果を見て，通信を続けられるか相談しよう．',3,5)}<div class="panel"><div class="observation"><div class="big-icon">${view.icon}</div><h2>${view.title}</h2><p>${view.text}</p><div class="evidence"><div><strong>送信されたもの</strong><span>${view.packet}</span></div><span>→</span><div><strong>Eveが使える鍵</strong><span>${view.eveKey}</span></div></div>${view.notice?`<div class="notice">${view.notice}</div>`:''}</div><div class="actions">${button('やり直す','restart-public','secondary')}${view.canContinue?button(`${receiver}の復号へ進む`,'to-decrypt'):''}</div></div></section>`);document.querySelector('#restart-public').onclick=()=>{state.step=2;state.encryptKey=null;renderPublic()};if(view.canContinue)document.querySelector('#to-decrypt').onclick=()=>{state.step=4;renderPublic()}}
+  else if(state.step===4){setScreen(`<section class="screen">${head('STAGE 2｜STEP 3','受信者が復号する',`${receiver}は暗号文を受け取りました．`,4,5)}<div class="panel"><h2 class="question">${receiver}は，どの鍵なら読める？</h2>${keyCards(allKeys,state.decryptKey)}<div class="actions">${button('通信の最初からやり直す','restart-all','secondary')}${button('この鍵で復号する','decrypt','primary',!state.decryptKey)}</div></div></section>`);bindKeys('decryptKey',renderPublic);document.querySelector('#restart-all').onclick=()=>{state.step=2;state.encryptKey=null;state.decryptKey=null;renderPublic()};document.querySelector('#decrypt').onclick=()=>{if(canDecrypt(state.encryptKey,state.decryptKey,receiver)){state.step=5;renderPublic()}else renderDecryptObservation(receiver)}}
+  else{const enc=forward?'Bobの公開鍵':'Aliceの公開鍵',dec=forward?'Bobの秘密鍵':'Aliceの秘密鍵';setScreen(`<section class="screen success-screen"><div class="success-mark">✓</div><p class="kicker">MISSION COMPLETE</p><h1>安全な通信に成功！</h1><p class="lead">Eveには読まれず，${receiver}だけがメッセージを復号できました．</p><div class="flow-summary"><span>🔑 ${enc}</span><b>→ 暗号化 →</b><span>暗号文</span><b>→ 復号 →</b><span>🔑 ${dec}</span></div><div class="actions">${button('逆向きの通信に挑戦','reverse')}${button('ミッション選択へ','home-success','secondary')}</div></section>`);document.querySelector('#reverse').onclick=()=>{state.direction=forward?'bob-alice':'alice-bob';state.step=2;state.encryptKey=null;state.decryptKey=null;renderPublic()};document.querySelector('#home-success').onclick=showHome}
+}
+function observeEncryption(key,sender,receiver){if(key===`${receiver.toLowerCase()}-private`)return{icon:'⛔',title:'通信を開始できない',text:`${receiver}の秘密鍵は，${receiver}本人だけが所持しています．${sender}はこの鍵を使えません．`,packet:'まだ送信されていない',eveKey:'—',notice:'誰がその鍵を持っているかを確認しよう．',canContinue:false};if(key===`${sender.toLowerCase()}-private`)return{icon:'👁️',title:'Eveが内容を読めた',text:`${sender}の公開鍵は誰でも入手できます．Eveはその鍵を使って内容を読みました．`,packet:'暗号化されたデータ',eveKey:`${sender}の公開鍵`,notice:'ここで通信を止めて，別の鍵でやり直そう．',canContinue:false};if(key.endsWith('public'))return{icon:'🔒',title:'Eveには内容を読めない',text:'Eveは暗号文を盗聴しましたが，対応する秘密鍵を持っていません．',packet:'8f 3a c1 7d …（暗号文）',eveKey:'対応する秘密鍵なし',notice:'受信者が読めるかどうかは，まだ分かりません．',canContinue:true};return{icon:'?',title:'通信の状態を確認できない',text:'選んだ鍵では処理を続けられません．',packet:'—',eveKey:'—',canContinue:false}}
+function canDecrypt(enc,dec,receiver){return(receiver==='Alice'&&enc==='alice-public'&&dec==='alice-private')||(receiver==='Bob'&&enc==='bob-public'&&dec==='bob-private')}
+function renderDecryptObservation(receiver){const key=allKeys.find(k=>k.id===state.decryptKey);setScreen(`<section class="screen">${head('STAGE 2｜STEP 3','復号した結果を観察する','成功画面が出ない理由を，ペアで考えよう．',4,5)}<div class="panel"><div class="observation"><div class="big-icon">📄</div><h2>メッセージは読めないまま</h2><p>${receiver}が「${key.owner}」を使いましたが，暗号文は元の文章に戻りませんでした．</p><div class="evidence"><div><strong>受信したもの</strong><span>8f 3a c1 7d …</span></div><span>＋</span><div><strong>試した鍵</strong><span>🔑 ${key.owner}</span></div></div></div><div class="actions">${button('別の鍵を試す','try-another')}${button('通信の最初からやり直す','restart-after-decrypt','secondary')}</div></div></section>`);document.querySelector('#try-another').onclick=()=>{state.decryptKey=null;state.step=4;renderPublic()};document.querySelector('#restart-after-decrypt').onclick=()=>{state.encryptKey=null;state.decryptKey=null;state.step=2;renderPublic()}}
 
-function keyButton(key, handler){
-  const button=document.createElement('button');
-  button.className='key-card'; button.dataset.key=key.id;
-  button.innerHTML=`<span class="icon" aria-hidden="true">🔑</span><b>${key.label}</b><strong>${key.owner}</strong><span>${key.note}</span>`;
-  button.addEventListener('click',()=>handler(key,button)); return button;
-}
+function renderShared(){const keys=[{id:'shared',label:'SHARED KEY',owner:'AliceとBobの共通鍵',note:'AliceとBobが共有'},{id:'alice-private',label:'PRIVATE KEY',owner:'Aliceの秘密鍵',note:'Alice本人だけが所持'},{id:'eve-public',label:'PUBLIC KEY',owner:'Eveの公開鍵',note:'誰でも利用可能'}];if(state.step===1){setScreen(`<section class="screen">${head('STAGE 1｜SHARED-KEY ENCRYPTION','共通鍵で通信する','AliceとBobが同じ鍵を共有しているとします．',1,3)}<div class="panel"><h2 class="question">Aliceが暗号化に使う鍵は？</h2>${keyCards(keys,state.encryptKey)}<div class="actions">${button('通信を開始','shared-send','primary',!state.encryptKey)}</div></div></section>`);bindKeys('encryptKey',renderShared);document.querySelector('#shared-send').onclick=()=>{state.step=2;renderShared()}}else if(state.step===2){const safe=state.encryptKey==='shared';setScreen(`<section class="screen">${head('STAGE 1｜通信中','EveとBobを観察する','表示された結果から，鍵の役割を考えよう．',2,3)}<div class="panel"><div class="observation"><div class="big-icon">${safe?'🔒':'👁️'}</div><h2>${safe?'Eveには読めず，Bobは読めた':'AliceとBobだけの秘密を守れない'}</h2><p>${safe?'BobはAliceと共有している同じ鍵で復号しました．':'選んだ鍵で起きたことを確認し，別の鍵を試そう．'}</p></div><div class="actions">${button('やり直す','shared-retry','secondary')}${safe?button('結果を確認','shared-finish'):''}</div></div></section>`);document.querySelector('#shared-retry').onclick=()=>{state.step=1;state.encryptKey=null;renderShared()};if(safe)document.querySelector('#shared-finish').onclick=()=>{state.step=3;renderShared()}}else{setScreen(`<section class="screen success-screen"><div class="success-mark">✓</div><p class="kicker">MISSION COMPLETE</p><h1>共通鍵で通信できた！</h1><p class="lead">暗号化と復号に，AliceとBobが共有する同じ鍵を使いました．</p><div class="actions">${button('ミッション選択へ','shared-home')}</div></section>`);document.querySelector('#shared-home').onclick=showHome}}
 
-function showStage(id){
-  $$('.stage').forEach(s=>s.classList.toggle('active',s.id===id));
-  $$('.stage-tab').forEach(b=>{const active=b.dataset.stage===id;b.classList.toggle('active',active);b.setAttribute('aria-selected',active)});
-}
-$$('.stage-tab').forEach(b=>b.addEventListener('click',()=>showStage(b.dataset.stage)));
-
-keys.shared.forEach(key=>$('#shared-keys').append(keyButton(key,(selected,button)=>{
-  $$('#shared-keys .key-card').forEach(b=>b.classList.remove('correct','wrong'));
-  const log=$('#shared-log');
-  if(selected.id==='shared-ab'){
-    button.classList.add('correct'); $('#shared-packet').textContent='7f 2a 91 c4 …（暗号文）'; $('#shared-eve').textContent='暗号文は見えるが，共通鍵がないので読めない！';
-    log.className='log success'; log.innerHTML='<strong>通信成功！</strong><ol><li>AliceとBobが事前に同じ共通鍵を共有</li><li>Aliceが共通鍵で暗号化</li><li>Bobが同じ共通鍵で復号</li></ol><b>注意：</b>共通鍵を安全に渡す方法が別に必要です．';
-  }else{
-    button.classList.add('wrong'); $('#shared-packet').textContent='送信できません';
-    log.className='log error'; log.innerHTML=selected.id==='alice-only'?'<strong>その鍵はBobが持っていません．</strong><br>同じ鍵で復号する共通鍵暗号では，AliceとBobが共有する鍵が必要です．':'<strong>Eveも秘密鍵を持っています．</strong><br>Eve宛ての通信になり，AliceとBobだけの秘密を守れません．';
-  }
-})));
-
-let direction='alice-bob';
-function renderPublicKeys(){
-  const box=$('#public-keys'); box.innerHTML='';
-  keys.public.forEach(key=>box.append(keyButton(key,judgePublic)));
-}
-function setDirection(next){
-  direction=next; const forward=next==='alice-bob';
-  $$('.direction-switch button').forEach(b=>b.classList.toggle('active',b.dataset.direction===next));
-  $('#alice-role').textContent=forward?'送信者':'受信者'; $('#bob-role').textContent=forward?'受信者':'送信者';
-  $('#public-message').textContent=forward?'「テストの範囲は3章」':'「了解，確認します」'; $('#public-arrow').textContent=forward?'──────▶':'◀──────';
-  $('#key-question').textContent=`${forward?'Alice':'Bob'}が暗号化に使う鍵は？`;
-  $('#public-log').className='log'; $('#public-log').textContent='4本の鍵から1本を選んでください．';
-  $('#crypto-flow').innerHTML='<span>鍵を選んで通信開始</span>'; $('#public-eve').textContent='暗号文なら盗み見できるかも？'; renderPublicKeys();
-}
-function judgePublic(key,button){
-  $$('#public-keys .key-card').forEach(b=>b.classList.remove('correct','wrong'));
-  const receiver=direction==='alice-bob'?'Bob':'Alice'; const sender=direction==='alice-bob'?'Alice':'Bob';
-  const correct=direction==='alice-bob'?'bob-public':'alice-public'; const log=$('#public-log');
-  if(key.id===correct){
-    button.classList.add('correct'); log.className='log success';
-    log.innerHTML=`<strong>通信成功！</strong><ol><li>${sender}が${receiver}の公開鍵で暗号化</li><li>暗号文を送信</li><li>${receiver}が自分の秘密鍵で復号</li></ol>公開鍵は公開してよく，対応する秘密鍵は本人だけが保持します．`;
-    $('#crypto-flow').innerHTML=`<span>🔑 ${receiver}の公開鍵</span><span>暗号化</span><span>▧ 暗号文</span><span>🔑 ${receiver}の秘密鍵</span><span>復号成功</span>`;
-    $('#public-eve').textContent='暗号文は盗聴できた．でも秘密鍵がないので復号できない！';
-  }else{
-    button.classList.add('wrong'); log.className='log error';
-    if(key.label==='PRIVATE KEY' && !key.owner.startsWith(sender)) log.innerHTML=`<strong>他人の秘密鍵は使えません．</strong><br>${key.owner}は，本人だけが所持します．${sender}が自由に入手して使える鍵ではありません．`;
-    else if(key.label==='PRIVATE KEY') log.innerHTML=`<strong>送信者の秘密鍵で暗号化するミッションではありません．</strong><br>秘密鍵を使うデジタル署名は，次のステージで目的を分けて学びます．`;
-    else log.innerHTML=`<strong>受信者ではなく送信者の公開鍵です．</strong><br>${receiver}だけが読めるようにするには，${receiver}の公開鍵を選びます．`;
-    $('#crypto-flow').innerHTML='<span>鍵の選択を見直そう</span>';
-  }
-}
-$$('.direction-switch button').forEach(b=>b.addEventListener('click',()=>setDirection(b.dataset.direction)));
-setDirection('alice-bob');
-
-async function sha256(text){
-  if(crypto?.subtle){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('')}
-  let h=2166136261; for(const c of text){h^=c.charCodeAt(0);h=Math.imul(h,16777619)} return `教材用代替値-${(h>>>0).toString(16).padStart(8,'0')}`;
-}
-let signedHash='';
-$('#sign-button').addEventListener('click',async()=>{
-  const message=$('#sign-message').value.trim(); if(!message)return;
-  signedHash=await sha256(message); $('#received-message').value=message; $('#received-message').disabled=false;
-  const items=$$('#signature-flow li'); items.forEach(i=>i.classList.add('done'));
-  items[0].querySelector('small').textContent=message; items[1].querySelector('small').textContent=signedHash.slice(0,18)+'…';
-  items[2].querySelector('small').textContent='署名データを作成'; items[3].querySelector('small').textContent='ハッシュ一致 ✓';
-  $('#tamper-button').disabled=false; $('#verify-button').disabled=false;
-  $('#signature-result').className='log success'; $('#signature-result').innerHTML='<strong>署名の検証に成功しました．</strong><br>Aliceの公開鍵で検証できたため，Aliceの秘密鍵を持つ本人が作成し，内容も変わっていないと確認できます．';
-});
-$('#tamper-button').addEventListener('click',()=>{$('#received-message').value=$('#received-message').value.replace('10時','11時');$('#signature-result').className='log';$('#signature-result').textContent='Eveがメッセージを書き換えました．Bobが再検証してください．'});
-$('#verify-button').addEventListener('click',async()=>{
-  const receivedHash=await sha256($('#received-message').value); const ok=receivedHash===signedHash; const result=$('#signature-result'); result.className=`log ${ok?'success':'error'}`;
-  result.innerHTML=ok?'<strong>検証成功：ハッシュが一致しました．</strong><br>メッセージは署名後に変わっていません．':`<strong>検証失敗：改ざんを検出しました．</strong><br>署名時：${signedHash.slice(0,16)}…<br>受信時：${receivedHash.slice(0,16)}…<br>1文字でも変わるとハッシュ値が変わるため，署名と一致しません．`;
-  const last=$$('#signature-flow li')[3]; last.classList.toggle('done',ok); last.querySelector('small').textContent=ok?'ハッシュ一致 ✓':'ハッシュ不一致 ✕';
-});
+async function sha256(text){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return[...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+function renderSignature(){if(state.step===1){setScreen(`<section class="screen">${head('STAGE 3｜DIGITAL SIGNATURE','メッセージから署名を作る','署名の目的は，メッセージを秘密にすることではありません．',1,4)}<div class="panel"><div class="purpose-note">確認すること：送信者はAliceか／送信後に改ざんされていないか</div><div class="signature-input"><label for="sign-message">Aliceのメッセージ</label><textarea id="sign-message" rows="3">明日の集合は10時です</textarea>${button('SHA-256ハッシュを計算','make-hash')}</div></div></section>`);document.querySelector('#make-hash').onclick=async()=>{state.originalMessage=document.querySelector('#sign-message').value;state.signedHash=await sha256(state.originalMessage);state.step=2;renderSignature()}}else if(state.step===2){setScreen(`<section class="screen">${head('STAGE 3｜STEP 2','Aliceが署名する','メッセージから計算したハッシュ値を使います．',2,4)}<div class="panel"><div class="evidence"><div><strong>SHA-256ハッシュ</strong><span class="hash">${state.signedHash}</span></div><span>＋</span><div><strong>署名に使う鍵</strong><span>🔑 Aliceの秘密鍵</span></div></div><div class="observation"><p>Aliceの秘密鍵で署名データを作成します．</p></div><div class="actions">${button('署名してBobへ送る','sign-send')}</div></div></section>`);document.querySelector('#sign-send').onclick=()=>{state.step=3;renderSignature()}}else{setScreen(`<section class="screen">${head('STAGE 3｜STEP 3','Bobが署名を検証する','検証前に，Eveが内容を書き換える場合も試せます．',3,4)}<div class="panel"><div class="signature-input"><label for="received-message">Bobが受信したメッセージ</label><textarea id="received-message" rows="3">${state.originalMessage}</textarea><div class="actions">${button('Eveが10時を11時に改ざん','tamper','secondary')}${button('Aliceの公開鍵で検証','verify')}</div></div></div></section>`);document.querySelector('#tamper').onclick=()=>{document.querySelector('#received-message').value=document.querySelector('#received-message').value.replace('10時','11時')};document.querySelector('#verify').onclick=async()=>{const received=await sha256(document.querySelector('#received-message').value);renderSignatureResult(received===state.signedHash,received)}}}
+function renderSignatureResult(ok,received){setScreen(`<section class="screen ${ok?'success-screen':''}">${ok?'<div class="success-mark">✓</div>':''}${head('STAGE 3｜検証結果',ok?'署名の検証に成功！':'2つのハッシュ値が一致しない',ok?'Aliceが署名した後，内容は変わっていません．':'受信したメッセージは，署名時の内容と異なります．',4,4)}<div class="panel"><div class="evidence"><div><strong>署名時のハッシュ</strong><span class="hash">${state.signedHash}</span></div><span>${ok?'＝':'≠'}</span><div><strong>受信時のハッシュ</strong><span class="hash">${received}</span></div></div><div class="actions">${button('最初から試す','signature-retry','secondary')}${ok?button('ミッション選択へ','signature-home'):button('メッセージに戻る','signature-back')}</div></div></section>`);document.querySelector('#signature-retry').onclick=()=>{state.step=1;renderSignature()};if(ok)document.querySelector('#signature-home').onclick=showHome;else document.querySelector('#signature-back').onclick=()=>{state.step=3;renderSignature()}}
+showHome();
